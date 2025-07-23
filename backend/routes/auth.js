@@ -1,0 +1,327 @@
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import { body, validationResult } from 'express-validator';
+import User from '../models/User.js';
+
+const router = express.Router();
+
+// JWT token generation
+const generateToken = (userId) => {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_SECRET || 'your-fallback-secret',
+    { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+  );
+};
+
+// @route   POST /api/v1/auth/register
+// @desc    Register a new user
+// @access  Public
+router.post('/register', [
+  body('name')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Name must be between 2 and 50 characters'),
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long'),
+  body('phone')
+    .optional()
+    .isMobilePhone()
+    .withMessage('Please provide a valid phone number')
+], async (req, res) => {
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { name, email, password, phone } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email'
+      });
+    }
+
+    // Check if trying to register with admin email
+    if (User.isAdminEmail(email)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin accounts cannot be registered. Please contact system administrator.'
+      });
+    }
+
+    // Create new user
+    const user = new User({
+      name,
+      email,
+      password,
+      phone,
+      isAdmin: false,
+      role: 'user'
+    });
+
+    await user.save();
+
+    // Generate JWT token
+    const token = generateToken(user._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        isAdmin: user.isAdmin,
+        role: user.role,
+        vehicleCount: user.vehicleCount,
+        createdAt: user.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during registration'
+    });
+  }
+});
+
+// @route   POST /api/v1/auth/login
+// @desc    Login user and return JWT token
+// @access  Public
+router.post('/login', [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required')
+], async (req, res) => {
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { email, password } = req.body;
+
+    // Check if this is an admin login
+    if (User.isAdminEmail(email)) {
+      // Verify admin password
+      const adminPassword = process.env.ADMIN_PASSWORD || 'autocarpro12k@12k.wwc';
+      if (password !== adminPassword) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid admin credentials'
+        });
+      }
+
+      // Get admin data
+      const adminData = User.getAdminByEmail(email);
+      if (!adminData) {
+        return res.status(401).json({
+          success: false,
+          message: 'Admin not found'
+        });
+      }
+
+      // Check if admin user exists in database, if not create one
+      let adminUser = await User.findOne({ email });
+      if (!adminUser) {
+        adminUser = new User({
+          name: adminData.name,
+          email: email,
+          password: adminPassword,
+          isAdmin: true,
+          role: adminData.role,
+          vehicleCount: 0
+        });
+        await adminUser.save();
+      }
+
+      const token = generateToken(adminUser._id);
+
+      return res.json({
+        success: true,
+        message: 'Admin login successful',
+        token,
+        user: {
+          id: adminUser._id,
+          name: adminUser.name,
+          email: adminUser.email,
+          isAdmin: true,
+          role: adminUser.role,
+          vehicleCount: adminUser.vehicleCount,
+          createdAt: adminUser.createdAt
+        }
+      });
+    }
+
+    // Regular user login
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Account is deactivated. Please contact support.'
+      });
+    }
+
+    // Generate JWT token
+    const token = generateToken(user._id);
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        isAdmin: user.isAdmin,
+        role: user.role,
+        vehicleCount: user.vehicleCount,
+        lastService: user.lastService,
+        createdAt: user.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during login'
+    });
+  }
+});
+
+// @route   POST /api/v1/auth/verify-token
+// @desc    Verify JWT token
+// @access  Private
+router.post('/verify-token', async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
+    const user = await User.findById(decoded.userId);
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token or user not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        isAdmin: user.isAdmin,
+        role: user.role,
+        vehicleCount: user.vehicleCount,
+        lastService: user.lastService,
+        createdAt: user.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+});
+
+// @route   POST /api/v1/auth/refresh-token
+// @desc    Refresh JWT token
+// @access  Private
+router.post('/refresh-token', async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
+    const user = await User.findById(decoded.userId);
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found or inactive'
+      });
+    }
+
+    // Generate new token
+    const newToken = generateToken(user._id);
+
+    res.json({
+      success: true,
+      token: newToken,
+      message: 'Token refreshed successfully'
+    });
+
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+});
+
+export default router;
