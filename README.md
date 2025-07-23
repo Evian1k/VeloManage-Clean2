@@ -159,4 +159,3 @@ For support and questions:
 
 ---
 
-Built with ❤️ for the automotive service industry.
