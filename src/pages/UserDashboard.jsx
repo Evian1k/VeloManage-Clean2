@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet';
-import { Car, Bell, Wrench, MessageSquare } from 'lucide-react';
+import { Car, Bell, Wrench, MessageSquare, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useService } from '@/contexts/ServiceContext';
@@ -10,6 +10,7 @@ import UserOverview from '@/components/user/UserOverview';
 import UserRequests from '@/components/user/UserRequests';
 import UserNotifications from '@/components/user/UserNotifications';
 import UserMessages from '@/components/user/UserMessages';
+import LocationSharing from '@/components/user/LocationSharing';
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ const UserDashboard = () => {
   const TABS = [
     { id: 'overview', label: 'Overview', icon: <Car className="w-4 h-4" /> },
     { id: 'requests', label: 'My Requests', icon: <Wrench className="w-4 h-4" /> },
+    { id: 'location', label: 'Truck Pickup', icon: <MapPin className="w-4 h-4" /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" /> },
     { id: 'messages', label: 'Messages', icon: <MessageSquare className="w-4 h-4" /> }
   ];
@@ -59,6 +61,7 @@ const UserDashboard = () => {
 
       {activeTab === 'overview' && <UserOverview userRequests={userRequests} unreadNotifications={unreadNotifications} user={user} />}
       {activeTab === 'requests' && <UserRequests userRequests={userRequests} />}
+      {activeTab === 'location' && <LocationSharing />}
       {activeTab === 'notifications' && <UserNotifications notifications={notifications} />}
       {activeTab === 'messages' && <UserMessages />}
     </div>
