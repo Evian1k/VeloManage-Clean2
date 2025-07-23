@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import User from '../models/User.js';
 import Truck from '../models/Truck.js';
+import Branch from '../models/Branch.js';
 
 // Load environment variables
 dotenv.config();
@@ -67,6 +68,90 @@ const initializeAdmins = async () => {
       console.log(`✅ Created admin: ${adminData.name}`);
     } else {
       console.log(`👤 Admin already exists: ${adminData.name}`);
+    }
+  }
+};
+
+// Initialize branches
+const initializeBranches = async () => {
+  console.log('🏢 Initializing branches...');
+  
+  const branches = [
+    {
+      name: 'AutoCare CBD Branch',
+      code: 'AC-CBD',
+      location: {
+        address: 'Kimathi Street, Nairobi CBD',
+        city: 'Nairobi',
+        state: 'Nairobi County',
+        zipCode: '00100',
+        coordinates: {
+          latitude: -1.2921,
+          longitude: 36.8219
+        }
+      },
+      contact: {
+        phone: '+254700100200',
+        email: 'cbd@autocare.com'
+      },
+      workingHours: {
+        monday: { open: '08:00', close: '18:00', isOpen: true },
+        tuesday: { open: '08:00', close: '18:00', isOpen: true },
+        wednesday: { open: '08:00', close: '18:00', isOpen: true },
+        thursday: { open: '08:00', close: '18:00', isOpen: true },
+        friday: { open: '08:00', close: '18:00', isOpen: true },
+        saturday: { open: '09:00', close: '16:00', isOpen: true },
+        sunday: { open: '10:00', close: '14:00', isOpen: false }
+      },
+      services: ['maintenance', 'repair', 'inspection', 'emergency'],
+      capacity: {
+        maxTrucks: 30,
+        serviceSlots: 8
+      }
+    },
+    {
+      name: 'AutoCare Westlands Branch',
+      code: 'AC-WL',
+      location: {
+        address: 'Westlands Road, Westlands',
+        city: 'Nairobi',
+        state: 'Nairobi County',
+        zipCode: '00600',
+        coordinates: {
+          latitude: -1.2635,
+          longitude: 36.8078
+        }
+      },
+      contact: {
+        phone: '+254700100201',
+        email: 'westlands@autocare.com'
+      },
+      workingHours: {
+        monday: { open: '07:30', close: '19:00', isOpen: true },
+        tuesday: { open: '07:30', close: '19:00', isOpen: true },
+        wednesday: { open: '07:30', close: '19:00', isOpen: true },
+        thursday: { open: '07:30', close: '19:00', isOpen: true },
+        friday: { open: '07:30', close: '19:00', isOpen: true },
+        saturday: { open: '08:00', close: '17:00', isOpen: true },
+        sunday: { open: '09:00', close: '15:00', isOpen: true }
+      },
+      services: ['maintenance', 'repair', 'fuel', 'car_wash'],
+      capacity: {
+        maxTrucks: 25,
+        serviceSlots: 6
+      }
+    }
+  ];
+
+  for (const branchData of branches) {
+    const existingBranch = await Branch.findOne({ code: branchData.code });
+    
+    if (!existingBranch) {
+      const branch = new Branch(branchData);
+      await branch.save();
+      console.log(`✅ Created branch: ${branchData.name}`);
+    } else {
+      console.log(`🏢 Branch already exists: ${branchData.name}`);
     }
   }
 };
@@ -210,12 +295,14 @@ const initializeDatabase = async () => {
     
     await connectDB();
     await initializeAdmins();
+    await initializeBranches();
     await initializeTrucks();
     await initializeSampleUsers();
     
     console.log('✅ Database initialization completed successfully!');
     console.log('\n📋 Summary:');
     console.log('- Admin users created/verified');
+    console.log('- Branch locations initialized');
     console.log('- Truck fleet initialized');
     console.log('- Sample users created');
     console.log('\n🔐 Admin Login Details:');

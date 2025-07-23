@@ -14,6 +14,9 @@ import serviceRoutes from './routes/services.js';
 import truckRoutes from './routes/trucks.js';
 import messageRoutes from './routes/messages.js';
 import pickupRoutes from './routes/pickups.js';
+import branchRoutes from './routes/branches.js';
+import bookingRoutes from './routes/bookings.js';
+import analyticsRoutes from './routes/analytics.js';
 
 // Import middleware
 import { authenticateToken } from './middleware/auth.js';
@@ -71,6 +74,9 @@ app.use(`/api/${apiVersion}/services`, authenticateToken, serviceRoutes);
 app.use(`/api/${apiVersion}/trucks`, authenticateToken, truckRoutes);
 app.use(`/api/${apiVersion}/messages`, authenticateToken, messageRoutes);
 app.use(`/api/${apiVersion}/pickups`, authenticateToken, pickupRoutes);
+app.use(`/api/${apiVersion}/branches`, authenticateToken, branchRoutes);
+app.use(`/api/${apiVersion}/bookings`, authenticateToken, bookingRoutes);
+app.use(`/api/${apiVersion}/analytics`, authenticateToken, analyticsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -94,7 +100,10 @@ app.get('/', (req, res) => {
       services: `/api/${apiVersion}/services`,
       trucks: `/api/${apiVersion}/trucks`,
       messages: `/api/${apiVersion}/messages`,
-      pickups: `/api/${apiVersion}/pickups`
+      pickups: `/api/${apiVersion}/pickups`,
+      branches: `/api/${apiVersion}/branches`,
+      bookings: `/api/${apiVersion}/bookings`,
+      analytics: `/api/${apiVersion}/analytics`
     }
   });
 });

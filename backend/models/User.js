@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin', 'main_admin'],
+    enum: ['user', 'admin', 'main_admin', 'super_admin', 'driver', 'mechanic', 'manager'],
     default: 'user'
   },
   vehicleCount: {
@@ -96,7 +96,23 @@ userSchema.methods.toJSON = function() {
 
 // Check if user is admin
 userSchema.methods.isAdminUser = function() {
-  return this.isAdmin && ['admin', 'main_admin'].includes(this.role);
+  return this.isAdmin && ['admin', 'main_admin', 'super_admin'].includes(this.role);
+};
+
+// Check role permissions
+userSchema.methods.hasPermission = function(permission) {
+  const rolePermissions = {
+    super_admin: ['all'],
+    main_admin: ['manage_users', 'manage_trucks', 'manage_branches', 'view_analytics', 'manage_bookings'],
+    admin: ['manage_trucks', 'view_analytics', 'manage_bookings'],
+    manager: ['manage_branch', 'manage_staff', 'view_reports'],
+    mechanic: ['update_maintenance', 'view_trucks'],
+    driver: ['update_location', 'view_assigned_trucks'],
+    user: ['book_service', 'view_own_data']
+  };
+
+  const userPermissions = rolePermissions[this.role] || [];
+  return userPermissions.includes('all') || userPermissions.includes(permission);
 };
 
 // Admin emails configuration
