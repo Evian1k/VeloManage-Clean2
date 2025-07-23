@@ -17,6 +17,7 @@ import pickupRoutes from './routes/pickups.js';
 import branchRoutes from './routes/branches.js';
 import bookingRoutes from './routes/bookings.js';
 import analyticsRoutes from './routes/analytics.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 // Import middleware
 import { authenticateToken } from './middleware/auth.js';
@@ -66,6 +67,9 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serve uploaded files
+app.use('/uploads', express.static('uploads'));
+
 // API Routes
 const apiVersion = process.env.API_VERSION || 'v1';
 app.use(`/api/${apiVersion}/auth`, authRoutes);
@@ -77,6 +81,7 @@ app.use(`/api/${apiVersion}/pickups`, authenticateToken, pickupRoutes);
 app.use(`/api/${apiVersion}/branches`, authenticateToken, branchRoutes);
 app.use(`/api/${apiVersion}/bookings`, authenticateToken, bookingRoutes);
 app.use(`/api/${apiVersion}/analytics`, authenticateToken, analyticsRoutes);
+app.use(`/api/${apiVersion}/dashboard`, authenticateToken, dashboardRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -103,7 +108,8 @@ app.get('/', (req, res) => {
       pickups: `/api/${apiVersion}/pickups`,
       branches: `/api/${apiVersion}/branches`,
       bookings: `/api/${apiVersion}/bookings`,
-      analytics: `/api/${apiVersion}/analytics`
+      analytics: `/api/${apiVersion}/analytics`,
+      dashboard: `/api/${apiVersion}/dashboard`
     }
   });
 });

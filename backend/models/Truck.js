@@ -128,7 +128,23 @@ const truckSchema = new mongoose.Schema({
       default: 0
     },
     notes: [String]
-  }
+  },
+  documents: [{
+    name: String,
+    filename: String,
+    type: String,
+    size: Number,
+    url: String,
+    uploadDate: {
+      type: Date,
+      default: Date.now
+    },
+    category: {
+      type: String,
+      enum: ['insurance', 'registration', 'inspection', 'maintenance', 'other'],
+      default: 'other'
+    }
+  }]
 }, {
   timestamps: true
 });

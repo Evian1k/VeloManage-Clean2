@@ -64,18 +64,25 @@ messageSchema.statics.sendAutoReply = async function(userId) {
     return null; // Don't send another auto-reply
   }
 
-  // Create auto-reply message
-  const autoReply = new this({
-    sender: null, // System message
-    recipient: userId,
-    conversation: userId.toString(),
-    text: "Thanks for your message! An admin will review it shortly and get back to you.",
-    senderType: 'admin',
-    isAutoReply: true,
-    isRead: false
-  });
+  try {
+    // Create auto-reply message
+    const autoReply = new this({
+      sender: null, // System message
+      recipient: userId,
+      conversation: userId.toString(),
+      text: "Thanks for your message! An admin will review it shortly and get back to you.",
+      senderType: 'admin',
+      isAutoReply: true,
+      isRead: false
+    });
 
-  return autoReply.save();
+    const savedAutoReply = await autoReply.save();
+    console.log(`✅ Auto-reply sent to user ${userId}`);
+    return savedAutoReply;
+  } catch (error) {
+    console.error('Error sending auto-reply:', error);
+    return null;
+  }
 };
 
 // Static method to get conversation between user and admin

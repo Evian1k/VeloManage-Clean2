@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import Truck from '../models/Truck.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { uploadTruckDocuments, handleUploadError, processUploadedFiles } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -67,7 +68,7 @@ router.get('/:id', async (req, res) => {
 // @route   POST /api/v1/trucks
 // @desc    Create new truck
 // @access  Admin only
-router.post('/', requireAdmin, [
+router.post('/', requireAdmin, uploadTruckDocuments, handleUploadError, [
   body('truckId').trim().notEmpty().withMessage('Truck ID is required'),
   body('driver.name').trim().notEmpty().withMessage('Driver name is required'),
   body('driver.phone').trim().notEmpty().withMessage('Driver phone is required'),
@@ -99,7 +100,13 @@ router.post('/', requireAdmin, [
       });
     }
 
-    const truck = new Truck(req.body);
+    // Process uploaded documents
+    const uploadedDocs = processUploadedFiles(req.files);
+    
+    const truck = new Truck({
+      ...req.body,
+      documents: uploadedDocs
+    });
     await truck.save();
 
     res.status(201).json({
@@ -347,6 +354,96 @@ router.put('/:id/complete', requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error completing assignment'
+    });
+  }
+});
+
+// @route   POST /api/v1/trucks/:id/documents
+// @desc    Upload documents for truck
+// @access  Admin only
+router.post('/:id/documents', requireAdmin, uploadTruckDocuments, handleUploadError, async (req, res) => {
+  try {
+    const truck = await Truck.findById(req.params.id);
+    if (!truck) {
+      return res.status(404).json({
+        success: false,
+        message: 'Truck not found'
+      });
+    }
+
+    // Process uploaded documents
+    const uploadedDocs = processUploadedFiles(req.files);
+    
+    if (uploadedDocs.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded'
+      });
+    }
+
+    // Add documents to truck
+    truck.documents = truck.documents || [];
+    truck.documents.push(...uploadedDocs);
+    await truck.save();
+
+    res.json({
+      success: true,
+      message: `${uploadedDocs.length} document(s) uploaded successfully`,
+      data: {
+        uploadedDocuments: uploadedDocs,
+        truck: truck
+      }
+    });
+
+  } catch (error) {
+    console.error('Upload truck documents error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading documents'
+    });
+  }
+});
+
+// @route   DELETE /api/v1/trucks/:id/documents/:docId
+// @desc    Delete truck document
+// @access  Admin only
+router.delete('/:id/documents/:docId', requireAdmin, async (req, res) => {
+  try {
+    const truck = await Truck.findById(req.params.id);
+    if (!truck) {
+      return res.status(404).json({
+        success: false,
+        message: 'Truck not found'
+      });
+    }
+
+    const docIndex = truck.documents.findIndex(doc => doc._id.toString() === req.params.docId);
+    if (docIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Remove document from truck
+    const removedDoc = truck.documents[docIndex];
+    truck.documents.splice(docIndex, 1);
+    await truck.save();
+
+    // Try to delete physical file
+    // deleteFile(removedDoc.url.replace('/uploads/', ''));
+
+    res.json({
+      success: true,
+      message: 'Document deleted successfully',
+      data: truck
+    });
+
+  } catch (error) {
+    console.error('Delete truck document error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting document'
     });
   }
 });

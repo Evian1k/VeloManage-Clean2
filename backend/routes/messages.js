@@ -77,9 +77,15 @@ router.post('/', [
 
     await message.save();
 
+    // Populate sender information
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'name email role')
+      .populate('recipient', 'name email role');
+
     // Send auto-reply for first user message
+    let autoReply = null;
     if (!isAdmin) {
-      await Message.sendAutoReply(req.user._id);
+      autoReply = await Message.sendAutoReply(req.user._id);
     }
 
     // Emit real-time notification
@@ -89,22 +95,27 @@ router.post('/', [
       text: message.text,
       senderType: message.senderType,
       senderName: req.user.name,
+      senderId: req.user._id,
       timestamp: message.createdAt,
-      conversationId
+      conversationId,
+      message: populatedMessage
     };
 
-    if (isAdmin) {
-      // Notify specific user
+    if (isAdmin && recipientId) {
+      // Admin sending to specific user
       io.to(`user-${recipientId}`).emit('message-received', eventData);
-    } else {
-      // Notify all admins
+      console.log(`📨 Admin message sent to user ${recipientId}`);
+    } else if (!isAdmin) {
+      // User sending to all admins
       io.to('admin-room').emit('message-received', eventData);
+      console.log(`📨 User message sent to admin room from ${req.user.name}`);
     }
 
     res.status(201).json({
       success: true,
       message: 'Message sent successfully',
-      data: message
+      data: populatedMessage,
+      autoReply: autoReply
     });
 
   } catch (error) {
