@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import NotificationSystem from '@/components/NotificationSystem';
 
 const AdminHeader = () => {
   const { user, logout } = useAuth();
@@ -36,6 +37,8 @@ const AdminHeader = () => {
       </div>
       
       <div className="flex items-center gap-4 mt-4 md:mt-0">
+        <NotificationSystem />
+        
         <div className="flex items-center gap-2 px-3 py-1 bg-red-600 rounded-full">
           <Shield className="w-4 h-4 text-white" />
           <span className="text-white text-sm font-medium">Admin</span>

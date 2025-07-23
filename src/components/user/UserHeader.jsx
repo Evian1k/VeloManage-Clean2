@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import NotificationSystem from '@/components/NotificationSystem';
 
 const UserHeader = ({ unreadCount, onNotificationClick }) => {
   const { user, logout } = useAuth();
@@ -37,21 +38,7 @@ const UserHeader = ({ unreadCount, onNotificationClick }) => {
       </div>
       
       <div className="flex items-center gap-4 mt-4 md:mt-0">
-        <div className="relative">
-          <Button
-            variant="outline"
-            size="icon"
-            className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
-            onClick={onNotificationClick}
-          >
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <Badge className="absolute -top-2 -right-2 w-5 h-5 p-0 flex items-center justify-center bg-red-500 text-white notification-badge">
-                {unreadCount}
-              </Badge>
-            )}
-          </Button>
-        </div>
+        <NotificationSystem />
         
         <Avatar>
           <AvatarFallback className="bg-red-600 text-white">

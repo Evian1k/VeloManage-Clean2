@@ -186,12 +186,49 @@ export const FEATURE_FLAGS = {
 
 // Admin Configuration
 export const ADMIN_CONFIG = {
+  ADMINS: [
+    {
+      name: 'Emmanuel Evian',
+      email: 'emmanuel.evian@autocare.com',
+      username: 'emmanuelevian',
+      password: 'autocarpro12k@12k.wwc',
+      role: 'main_admin'
+    },
+    {
+      name: 'Ibrahim Mohamud',
+      email: 'ibrahim.mohamud@autocare.com',
+      username: 'ibrahim.mohamud',
+      password: 'autocarpro12k@12k.wwc',
+      role: 'admin'
+    },
+    {
+      name: 'Joel Ng\'ang\'a',
+      email: 'joel.nganga@autocare.com',
+      username: 'joel.nganga',
+      password: 'autocarpro12k@12k.wwc',
+      role: 'admin'
+    },
+    {
+      name: 'Patience Karanja',
+      email: 'patience.karanja@autocare.com',
+      username: 'patience.karanja',
+      password: 'autocarpro12k@12k.wwc',
+      role: 'admin'
+    },
+    {
+      name: 'Joyrose Kinuthia',
+      email: 'joyrose.kinuthia@autocare.com',
+      username: 'joyrose.kinuthia',
+      password: 'autocarpro12k@12k.wwc',
+      role: 'admin'
+    }
+  ],
   EMAILS: [
     'emmanuel.evian@autocare.com',
-    'joel.nganga@autocare.com',
     'ibrahim.mohamud@autocare.com',
-    'patience.karanjah@autocare.com',
-    'admin@autocare.com'
+    'joel.nganga@autocare.com',
+    'patience.karanja@autocare.com',
+    'joyrose.kinuthia@autocare.com'
   ],
   PERMISSIONS: {
     VIEW_ALL_REQUESTS: true,

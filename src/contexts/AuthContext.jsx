@@ -29,11 +29,39 @@ export const AuthProvider = ({ children }) => {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     
+    // Check if this is an admin login
+    const admin = ADMIN_CONFIG.ADMINS.find(admin => 
+      admin.email === email && admin.password === password
+    );
+    
+    if (admin) {
+      const userData = {
+        id: admin.email,
+        email: admin.email,
+        name: admin.name,
+        username: admin.username,
+        isAdmin: true,
+        role: admin.role,
+        joinDate: new Date().toISOString(),
+        vehicleCount: 0,
+        lastService: null
+      };
+      
+      setUser(userData);
+      localStorage.setItem('autocare_user', JSON.stringify(userData));
+      return userData;
+    }
+    
+    // Regular user login (simplified - in production this would validate against a database)
+    if (ADMIN_CONFIG.EMAILS.includes(email)) {
+      throw new Error('Please use the correct admin password');
+    }
+    
     const userData = {
-      id: email === 'admin@autocare.com' ? 0 : Date.now(),
+      id: Date.now(),
       email,
       name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      isAdmin: ADMIN_USERS.includes(email) || email === 'admin@autocare.com',
+      isAdmin: false,
       joinDate: new Date().toISOString(),
       vehicleCount: Math.floor(Math.random() * 3) + 1,
       lastService: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString()
@@ -48,10 +76,15 @@ export const AuthProvider = ({ children }) => {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     
+    // Check if trying to register with admin email
+    if (ADMIN_CONFIG.EMAILS.includes(userData.email)) {
+      throw new Error('Admin accounts cannot be registered. Please contact system administrator.');
+    }
+    
     const newUser = {
       id: Date.now(),
       ...userData,
-      isAdmin: ADMIN_USERS.includes(userData.email),
+      isAdmin: false,
       joinDate: new Date().toISOString(),
       vehicleCount: 1,
       lastService: null

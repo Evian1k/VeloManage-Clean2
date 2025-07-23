@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Navigation, Clock, Send, Truck } from 'lucide-react';
+import { MapPin, Navigation, Clock, Send, Truck, Map } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTimeAgo } from '@/lib/utils';
+import MapView from '@/components/MapView';
 
 const LocationSharing = () => {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ const LocationSharing = () => {
   const [isSharing, setIsSharing] = useState(false);
   const [pickupRequests, setPickupRequests] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [trucks, setTrucks] = useState([]);
+  const [showMap, setShowMap] = useState(true);
 
   useEffect(() => {
     // Load user's pickup requests
@@ -26,6 +29,12 @@ const LocationSharing = () => {
       const allRequests = JSON.parse(savedRequests);
       const userRequests = allRequests.filter(req => req.userId === user?.id);
       setPickupRequests(userRequests);
+    }
+
+    // Load trucks data for map
+    const savedTrucks = localStorage.getItem('autocare_trucks');
+    if (savedTrucks) {
+      setTrucks(JSON.parse(savedTrucks));
     }
   }, [user]);
 
@@ -364,6 +373,36 @@ const LocationSharing = () => {
               ))}
             </CardContent>
           </Card>
+        </motion.div>
+      )}
+
+      {/* Map View */}
+      {showMap && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Map className="w-5 h-5" />
+              Your Location & Nearby Trucks
+            </h3>
+            <Button
+              onClick={() => setShowMap(!showMap)}
+              variant="outline"
+              size="sm"
+              className="border-red-900/50 text-red-300 hover:bg-red-900/20"
+            >
+              {showMap ? 'Hide Map' : 'Show Map'}
+            </Button>
+          </div>
+          <MapView 
+            trucks={trucks} 
+            pickupRequests={pickupRequests.filter(req => req.userId === user?.id)}
+            userLocation={location}
+            showControls={true}
+          />
         </motion.div>
       )}
     </div>

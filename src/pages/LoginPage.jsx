@@ -135,9 +135,23 @@ const LoginPage = () => {
 
             <div className="mt-6 p-4 bg-red-900/20 rounded-lg border border-red-900/30">
               <p className="text-sm text-gray-300 mb-2">Demo Accounts:</p>
-              <p className="text-xs text-gray-400">Admin: emmanuel.evian@autocare.com</p>
-              <p className="text-xs text-gray-400">User: user@example.com</p>
-              <p className="text-xs text-gray-400">Password: any password</p>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-green-400 font-medium">Regular User:</p>
+                  <p className="text-xs text-gray-400">Any email + any password</p>
+                </div>
+                <div>
+                  <p className="text-xs text-red-400 font-medium">Admin Accounts:</p>
+                  <div className="ml-2 space-y-1">
+                    <p className="text-xs text-gray-400">• emmanuel.evian@autocare.com</p>
+                    <p className="text-xs text-gray-400">• ibrahim.mohamud@autocare.com</p>
+                    <p className="text-xs text-gray-400">• joel.nganga@autocare.com</p>
+                    <p className="text-xs text-gray-400">• patience.karanja@autocare.com</p>
+                    <p className="text-xs text-gray-400">• joyrose.kinuthia@autocare.com</p>
+                  </div>
+                  <p className="text-xs text-yellow-400 mt-1">Password: autocarpro12k@12k.wwc</p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

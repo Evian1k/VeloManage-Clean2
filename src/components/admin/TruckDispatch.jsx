@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Truck, MapPin, Navigation, Clock, User, Send } from 'lucide-react';
+import { Truck, MapPin, Navigation, Clock, User, Send, Map } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDateTime, getTimeAgo } from '@/lib/utils';
+import MapView from '@/components/MapView';
 
 const TruckDispatch = () => {
   const [trucks, setTrucks] = useState([]);
   const [pickupRequests, setPickupRequests] = useState([]);
+  const [showMap, setShowMap] = useState(true);
   const { toast } = useToast();
 
   // Load data from localStorage
@@ -443,6 +445,35 @@ const TruckDispatch = () => {
               })}
             </CardContent>
           </Card>
+        </motion.div>
+      )}
+
+      {/* Map View */}
+      {showMap && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Map className="w-5 h-5" />
+              Live Fleet Map
+            </h3>
+            <Button
+              onClick={() => setShowMap(!showMap)}
+              variant="outline"
+              size="sm"
+              className="border-red-900/50 text-red-300 hover:bg-red-900/20"
+            >
+              {showMap ? 'Hide Map' : 'Show Map'}
+            </Button>
+          </div>
+          <MapView 
+            trucks={trucks} 
+            pickupRequests={pickupRequests}
+            showControls={true}
+          />
         </motion.div>
       )}
     </div>
