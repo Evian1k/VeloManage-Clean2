@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { ADMIN_CONFIG } from '@/lib/constants';
 
 const AuthContext = createContext();
 
@@ -10,12 +11,7 @@ export const useAuth = () => {
   return context;
 };
 
-const ADMIN_USERS = [
-  'emmanuel.evian@autocare.com',
-  'joel.nganga@autocare.com',
-  'ibrahim.mohamud@autocare.com',
-  'patience.karanjah@autocare.com'
-];
+  const ADMIN_USERS = ADMIN_CONFIG.EMAILS;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);

@@ -16,18 +16,20 @@ import { MessageProvider } from '@/contexts/MessageContext';
 import MyVehiclesPage from '@/pages/MyVehiclesPage';
 import ServiceHistoryPage from '@/pages/ServiceHistoryPage';
 import SettingsPage from '@/pages/SettingsPage';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 function App() {
   return (
-    <AuthProvider>
-      <ServiceProvider>
-        <MessageProvider>
-          <Router>
-            <div className="min-h-screen">
-              <Helmet>
-                <title>AutoCare Pro - Premium Car Management System</title>
-                <meta name="description" content="Professional car management and service system with real-time tracking, automated reminders, and comprehensive admin controls." />
-              </Helmet>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ServiceProvider>
+          <MessageProvider>
+            <Router>
+              <div className="min-h-screen">
+                <Helmet>
+                  <title>AutoCare Pro - Premium Car Management System</title>
+                  <meta name="description" content="Professional car management and service system with real-time tracking, automated reminders, and comprehensive admin controls." />
+                </Helmet>
               
               <Routes>
                 <Route path="/" element={<LandingPage />} />
@@ -91,12 +93,13 @@ function App() {
                 />
               </Routes>
               
-              <Toaster />
-            </div>
-          </Router>
-        </MessageProvider>
-      </ServiceProvider>
-    </AuthProvider>
+                <Toaster />
+              </div>
+            </Router>
+          </MessageProvider>
+        </ServiceProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
