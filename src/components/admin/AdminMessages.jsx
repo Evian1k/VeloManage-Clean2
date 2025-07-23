@@ -1,25 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Send, User } from 'lucide-react';
+import { Send, User, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/contexts/MessageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useToast } from '@/components/ui/use-toast';
 
 const AdminMessages = () => {
   const { user } = useAuth();
-  const { conversations, sendMessageToUser, usersWithMessages } = useMessages();
+  const { conversations, sendMessageToUser, usersWithMessages, refreshUserList } = useMessages();
   const [selectedUser, setSelectedUser] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (usersWithMessages.length > 0 && !selectedUser) {
       setSelectedUser(usersWithMessages[0]);
     }
   }, [usersWithMessages, selectedUser]);
+
+  // Add a manual refresh function for better UX
+  const refreshMessages = () => {
+    refreshUserList();
+    // Also refresh conversations
+    window.location.reload();
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,6 +41,10 @@ const AdminMessages = () => {
     if (newMessage.trim() && selectedUser) {
       sendMessageToUser(selectedUser.id, newMessage);
       setNewMessage('');
+      toast({
+        title: "Reply sent!",
+        description: `Your reply has been sent to ${selectedUser.name}.`,
+      });
     }
   };
 
@@ -47,28 +60,46 @@ const AdminMessages = () => {
       >
         <Card className="glass-effect border-red-900/30 h-full flex flex-col">
           <CardHeader>
-            <CardTitle className="text-white">Conversations</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-white">Conversations</CardTitle>
+              <Button
+                onClick={refreshMessages}
+                variant="outline"
+                size="sm"
+                className="border-red-900/50 text-red-300 hover:bg-red-900/20"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="flex-grow overflow-y-auto space-y-2">
-            {usersWithMessages.map((convUser) => (
-              <div
-                key={convUser.id}
-                onClick={() => setSelectedUser(convUser)}
-                className={`p-3 rounded-lg cursor-pointer flex items-center gap-3 transition-colors ${
-                  selectedUser?.id === convUser.id ? 'bg-red-600/50' : 'hover:bg-white/10'
-                }`}
-              >
-                <Avatar>
-                  <AvatarFallback className="bg-blue-600 text-white">{convUser.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-semibold text-white">{convUser.name}</p>
-                  <p className="text-sm text-gray-400 truncate">
-                    {conversations[convUser.id]?.slice(-1)[0]?.text || 'No messages yet'}
-                  </p>
-                </div>
+            {usersWithMessages.length === 0 ? (
+              <div className="text-center text-gray-400 py-8">
+                <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No conversations yet</p>
+                <p className="text-sm">Users will appear here when they send messages</p>
               </div>
-            ))}
+            ) : (
+              usersWithMessages.map((convUser) => (
+                <div
+                  key={convUser.id}
+                  onClick={() => setSelectedUser(convUser)}
+                  className={`p-3 rounded-lg cursor-pointer flex items-center gap-3 transition-colors ${
+                    selectedUser?.id === convUser.id ? 'bg-red-600/50' : 'hover:bg-white/10'
+                  }`}
+                >
+                  <Avatar>
+                    <AvatarFallback className="bg-blue-600 text-white">{convUser.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-semibold text-white">{convUser.name}</p>
+                    <p className="text-sm text-gray-400 truncate">
+                      {conversations[convUser.id]?.slice(-1)[0]?.text || 'No messages yet'}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </motion.div>

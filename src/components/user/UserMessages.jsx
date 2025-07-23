@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useToast } from '@/components/ui/use-toast';
 
 const UserMessages = () => {
   const { user } = useAuth();
   const { messages, sendMessage } = useMessages();
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+  const { toast } = useToast();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -25,6 +27,10 @@ const UserMessages = () => {
     if (newMessage.trim()) {
       sendMessage(newMessage);
       setNewMessage('');
+      toast({
+        title: "Message sent!",
+        description: "Your message has been sent to the admin team.",
+      });
     }
   };
 

@@ -23,19 +23,26 @@ const getAllConversations = () => {
   return conversations;
 };
 
-const getAllUsers = () => {
+const getUsersFromMessages = () => {
   const users = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key.startsWith('autocare_user_')) { // Assuming we store users like this, but we store one user
-        // This part is tricky with the current auth setup. We'll mock it.
-    }
+  const userList = JSON.parse(localStorage.getItem('autocare_message_users') || '[]');
+  return userList;
+};
+
+const saveUserToMessageList = (user) => {
+  const existingUsers = getUsersFromMessages();
+  const userExists = existingUsers.find(u => u.id === user.id);
+  
+  if (!userExists) {
+    const newUserList = [...existingUsers, {
+      id: user.id,
+      name: user.name,
+      email: user.email
+    }];
+    localStorage.setItem('autocare_message_users', JSON.stringify(newUserList));
+    return newUserList;
   }
-  // Mocking users who have sent messages
-  return [
-      { id: 1, name: 'John Doe', email: 'john.doe@example.com' },
-      { id: 2, name: 'Jane Smith', email: 'jane.smith@example.com' }
-  ];
+  return existingUsers;
 };
 
 
@@ -44,19 +51,21 @@ export const MessageProvider = ({ children }) => {
   const [conversations, setConversations] = useState({});
   const [usersWithMessages, setUsersWithMessages] = useState([]);
 
+  const refreshUserList = () => {
+    if (user?.isAdmin) {
+      const messageUsers = getUsersFromMessages();
+      setUsersWithMessages(messageUsers);
+    }
+  };
+
   useEffect(() => {
     if (user?.isAdmin) {
       const allConvos = getAllConversations();
       setConversations(allConvos);
       
-      // This is a simplified way to get users. A real app would have a user list.
-      const userIds = Object.keys(allConvos);
-      const mockUsers = userIds.map(id => ({
-          id: id,
-          name: `User ${id}`,
-          email: `user${id}@example.com`
-      }));
-      setUsersWithMessages(mockUsers);
+      // Get users who have sent messages
+      const messageUsers = getUsersFromMessages();
+      setUsersWithMessages(messageUsers);
 
     } else if (user) {
       const savedMessages = localStorage.getItem(`autocare_messages_${user.id}`);
@@ -82,18 +91,26 @@ export const MessageProvider = ({ children }) => {
     setConversations(newConversations);
     localStorage.setItem(`autocare_messages_${user.id}`, JSON.stringify(updatedMessages));
 
-    setTimeout(() => {
-      const reply = {
-        id: Date.now() + 1,
-        sender: 'admin',
-        text: "Thanks for your message! An admin will review it shortly and get back to you.",
-        timestamp: new Date().toISOString()
-      };
-      const messagesWithReply = [...updatedMessages, reply];
-      const finalConversations = { ...conversations, [user.id]: messagesWithReply };
-      setConversations(finalConversations);
-      localStorage.setItem(`autocare_messages_${user.id}`, JSON.stringify(messagesWithReply));
-    }, 1500);
+    // Save user to message list for admin view
+    const updatedUserList = saveUserToMessageList(user);
+    setUsersWithMessages(updatedUserList);
+
+    // Only send auto-reply if this is the user's first message
+    const isFirstMessage = userMessages.length === 0;
+    if (isFirstMessage) {
+      setTimeout(() => {
+        const reply = {
+          id: Date.now() + 1,
+          sender: 'admin',
+          text: "Thanks for your message! An admin will review it shortly and get back to you.",
+          timestamp: new Date().toISOString()
+        };
+        const messagesWithReply = [...updatedMessages, reply];
+        const finalConversations = { ...conversations, [user.id]: messagesWithReply };
+        setConversations(finalConversations);
+        localStorage.setItem(`autocare_messages_${user.id}`, JSON.stringify(messagesWithReply));
+      }, 1500);
+    }
   };
 
   const sendMessageToUser = (userId, text) => {
@@ -111,6 +128,12 @@ export const MessageProvider = ({ children }) => {
     const newConversations = { ...conversations, [userId]: updatedMessages };
     setConversations(newConversations);
     localStorage.setItem(`autocare_messages_${userId}`, JSON.stringify(updatedMessages));
+    
+    // Update the admin's view of conversations
+    if (user?.isAdmin) {
+      const allConvos = getAllConversations();
+      setConversations(allConvos);
+    }
   };
 
   const value = {
@@ -119,6 +142,7 @@ export const MessageProvider = ({ children }) => {
     usersWithMessages,
     sendMessage,
     sendMessageToUser,
+    refreshUserList,
   };
 
   return (
