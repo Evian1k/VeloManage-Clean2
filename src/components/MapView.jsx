@@ -81,6 +81,9 @@ const MapView = ({ showControls = true, height = 400 }) => {
 
     const ctx = canvas.getContext('2d');
     const { width, height } = canvas;
+    
+    // Destructure data from mapData state
+    const { trucks, pickupRequests, branches } = mapData;
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -241,7 +244,7 @@ const MapView = ({ showControls = true, height = 400 }) => {
 
   useEffect(() => {
     drawMap();
-  }, [trucks, pickupRequests, userLocation, mapCenter, zoom]);
+  }, [mapData, userLocation, mapCenter, zoom]);
 
   const handleCanvasClick = (event) => {
     const canvas = canvasRef.current;
@@ -340,19 +343,19 @@ const MapView = ({ showControls = true, height = 400 }) => {
           {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-xl font-bold text-white">{trucks.filter(t => t.status === 'available').length}</div>
+              <div className="text-xl font-bold text-white">{mapData.trucks.filter(t => t.status === 'available').length}</div>
               <div className="text-sm text-gray-400">Available</div>
             </div>
             <div className="text-center">
-              <div className="text-xl font-bold text-white">{trucks.filter(t => t.status === 'dispatched').length}</div>
+              <div className="text-xl font-bold text-white">{mapData.trucks.filter(t => t.status === 'dispatched').length}</div>
               <div className="text-sm text-gray-400">Dispatched</div>
             </div>
             <div className="text-center">
-              <div className="text-xl font-bold text-white">{pickupRequests.filter(r => r.status === 'pending').length}</div>
+              <div className="text-xl font-bold text-white">{mapData.pickupRequests.filter(r => r.status === 'pending').length}</div>
               <div className="text-sm text-gray-400">Pending</div>
             </div>
             <div className="text-center">
-              <div className="text-xl font-bold text-white">{pickupRequests.filter(r => r.status === 'dispatched' || r.status === 'en-route').length}</div>
+              <div className="text-xl font-bold text-white">{mapData.pickupRequests.filter(r => r.status === 'dispatched' || r.status === 'en-route').length}</div>
               <div className="text-sm text-gray-400">Active</div>
             </div>
           </div>
