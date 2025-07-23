@@ -2,9 +2,30 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import User from '../models/User.js';
-import { checkDuplicateEmail, checkEmailAvailability } from '../middleware/duplicateEmailCheck.js';
 
 const router = express.Router();
+
+// @route   GET /api/v1/auth/test-admin
+// @desc    Test admin email validation
+// @access  Public
+router.get('/test-admin/:email', (req, res) => {
+  const email = req.params.email;
+  const isAdmin = User.isAdminEmail(email);
+  const adminData = User.getAdminByEmail(email);
+  
+  res.json({
+    email,
+    isAdmin,
+    adminData,
+    adminEmails: [
+      'emmanuel.evian@autocare.com',
+      'ibrahim.mohamud@autocare.com',
+      'joel.nganga@autocare.com',
+      'patience.karanja@autocare.com',
+      'joyrose.kinuthia@autocare.com'
+    ]
+  });
+});
 
 // JWT token generation
 const generateToken = (userId) => {
@@ -15,13 +36,8 @@ const generateToken = (userId) => {
   );
 };
 
-// @route   GET /api/v1/auth/check-email/:email
-// @desc    Check if email is available for registration
-// @access  Public
-router.get('/check-email/:email', checkEmailAvailability);
-
 // @route   POST /api/v1/auth/register
-// @desc    Register a new user with duplicate email protection
+// @desc    Register a new user
 // @access  Public
 router.post('/register', [
   body('name')
@@ -39,9 +55,7 @@ router.post('/register', [
     .optional()
     .isMobilePhone()
     .withMessage('Please provide a valid phone number')
-], 
-checkDuplicateEmail, // This middleware will handle duplicate emails
-async (req, res) => {
+], async (req, res) => {
   try {
     console.log('Registration attempt:', { 
       email: req.body.email, 
@@ -61,8 +75,15 @@ async (req, res) => {
 
     const { name, email, password, phone } = req.body;
 
-    // Note: Duplicate email check is already handled by middleware
-    // If we reach here, the email is available for registration
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      console.log('User already exists:', email);
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email'
+      });
+    }
 
     // Check if trying to register with admin email
     console.log('Checking if admin email:', email, 'Is admin:', User.isAdminEmail(email));
@@ -79,8 +100,7 @@ async (req, res) => {
         console.log('Admin password mismatch');
         return res.status(403).json({
           success: false,
-          message: 'Invalid admin password for admin registration.',
-          code: 'INVALID_ADMIN_PASSWORD'
+          message: 'Invalid admin password for admin registration.'
         });
       }
       
@@ -92,8 +112,7 @@ async (req, res) => {
         console.log('No admin data found for email:', email);
         return res.status(403).json({
           success: false,
-          message: 'Email not authorized for admin registration.',
-          code: 'UNAUTHORIZED_ADMIN_EMAIL'
+          message: 'Email not authorized for admin registration.'
         });
       }
 
@@ -139,7 +158,7 @@ async (req, res) => {
       });
     }
 
-    // Create new regular user
+    // Create new user
     const user = new User({
       name,
       email,
@@ -172,17 +191,6 @@ async (req, res) => {
 
   } catch (error) {
     console.error('Registration error:', error);
-    
-    // Handle mongoose duplicate key error (just in case)
-    if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message: 'You have already been signed up with this email. Try signing in instead.',
-        code: 'EMAIL_ALREADY_EXISTS',
-        action: 'redirect_to_login'
-      });
-    }
-    
     res.status(500).json({
       success: false,
       message: 'Server error during registration'
@@ -271,18 +279,16 @@ router.post('/login', [
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'No account found with this email. Please register first.',
-        code: 'USER_NOT_FOUND',
-        action: 'redirect_to_register'
+        message: 'Invalid credentials'
       });
     }
 
     // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid credentials'
       });
     }
 
@@ -290,10 +296,11 @@ router.post('/login', [
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Your account has been deactivated. Please contact support.'
+        message: 'Account is deactivated. Please contact support.'
       });
     }
 
+    // Generate JWT token
     const token = generateToken(user._id);
 
     res.json({
@@ -363,6 +370,48 @@ router.get('/verify', async (req, res) => {
 
   } catch (error) {
     console.error('Token verification error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+});
+
+// @route   POST /api/v1/auth/refresh-token
+// @desc    Refresh JWT token
+// @access  Private
+router.post('/refresh-token', async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-fallback-secret');
+    const user = await User.findById(decoded.userId);
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found or inactive'
+      });
+    }
+
+    // Generate new token
+    const newToken = generateToken(user._id);
+
+    res.json({
+      success: true,
+      token: newToken,
+      message: 'Token refreshed successfully'
+    });
+
+  } catch (error) {
+    console.error('Token refresh error:', error);
     res.status(401).json({
       success: false,
       message: 'Invalid token'

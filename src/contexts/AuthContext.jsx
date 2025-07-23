@@ -148,13 +148,37 @@ export const AuthProvider = ({ children }) => {
         
         return newUserData;
       } else {
-        throw new Error(response.message || 'Registration failed');
+        // Enhanced error handling for duplicate emails
+        const error = new Error(response.message || 'Registration failed');
+        error.code = response.code;
+        error.action = response.action;
+        error.userType = response.userType;
+        throw error;
       }
     } catch (error) {
       console.error('Registration error:', error);
+      
+      // Enhanced error handling for better user experience
+      if (error.message && error.message.includes('already been signed up')) {
+        const enhancedError = new Error(error.message);
+        enhancedError.code = 'EMAIL_ALREADY_EXISTS';
+        enhancedError.action = 'redirect_to_login';
+        throw enhancedError;
+      }
+      
       throw error;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkEmailAvailability = async (email) => {
+    try {
+      const response = await apiService.checkEmailAvailability(email);
+      return response;
+    } catch (error) {
+      console.error('Error checking email availability:', error);
+      return { success: false, available: true, message: 'Could not check email availability' };
     }
   };
 
@@ -196,7 +220,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     loading,
-    updateUser
+    updateUser,
+    checkEmailAvailability
   };
 
   return (

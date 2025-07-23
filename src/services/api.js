@@ -54,6 +54,10 @@ class ApiService {
     });
   }
 
+  async checkEmailAvailability(email) {
+    return this.request(`/auth/check-email/${encodeURIComponent(email)}`);
+  }
+
   async verifyToken() {
     return this.request('/auth/verify');
   }
