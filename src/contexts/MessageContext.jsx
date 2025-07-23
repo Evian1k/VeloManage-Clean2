@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { apiService } from '../services/api';
 
 const MessageContext = createContext();
 
@@ -11,7 +12,8 @@ export const useMessages = () => {
   return context;
 };
 
-const getAllConversations = () => {
+// Helper functions for local storage backup (fallback)
+const getLocalConversations = () => {
   const conversations = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -23,14 +25,15 @@ const getAllConversations = () => {
   return conversations;
 };
 
-const getUsersFromMessages = () => {
-  const users = [];
-  const userList = JSON.parse(localStorage.getItem('autocare_message_users') || '[]');
-  return userList;
+const saveMessageLocally = (message, conversationId) => {
+  const key = `autocare_messages_${conversationId}`;
+  const existingMessages = JSON.parse(localStorage.getItem(key) || '[]');
+  const newMessages = [...existingMessages, message];
+  localStorage.setItem(key, JSON.stringify(newMessages));
 };
 
 const saveUserToMessageList = (user) => {
-  const existingUsers = getUsersFromMessages();
+  const existingUsers = JSON.parse(localStorage.getItem('autocare_message_users') || '[]');
   const userExists = existingUsers.find(u => u.id === user.id);
   
   if (!userExists) {
@@ -50,90 +53,172 @@ export const MessageProvider = ({ children }) => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState({});
   const [usersWithMessages, setUsersWithMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const refreshUserList = () => {
-    if (user?.isAdmin) {
-      const messageUsers = getUsersFromMessages();
-      setUsersWithMessages(messageUsers);
+  // Load messages from backend
+  const loadMessages = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      
+      if (user.isAdmin) {
+        // Admin: Load all conversations
+        const response = await apiService.getConversations();
+        if (response.success) {
+          setConversations(response.data || {});
+          setUsersWithMessages(response.users || []);
+        } else {
+          // Fallback to local storage
+          const localConvos = getLocalConversations();
+          setConversations(localConvos);
+        }
+      } else {
+        // User: Load own messages
+        const response = await apiService.getMessages();
+        if (response.success) {
+          setConversations({ [user.id]: response.data || [] });
+        } else {
+          // Fallback to local storage
+          const savedMessages = localStorage.getItem(`autocare_messages_${user.id}`);
+          setConversations({ [user.id]: savedMessages ? JSON.parse(savedMessages) : [] });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+      // Fallback to local storage
+      if (user.isAdmin) {
+        const localConvos = getLocalConversations();
+        setConversations(localConvos);
+      } else {
+        const savedMessages = localStorage.getItem(`autocare_messages_${user.id}`);
+        setConversations({ [user.id]: savedMessages ? JSON.parse(savedMessages) : [] });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user?.isAdmin) {
-      const allConvos = getAllConversations();
-      setConversations(allConvos);
-      
-      // Get users who have sent messages
-      const messageUsers = getUsersFromMessages();
-      setUsersWithMessages(messageUsers);
-
-    } else if (user) {
-      const savedMessages = localStorage.getItem(`autocare_messages_${user.id}`);
-      setConversations({ [user.id]: savedMessages ? JSON.parse(savedMessages) : [] });
+    if (user) {
+      loadMessages();
     } else {
       setConversations({});
+      setUsersWithMessages([]);
     }
   }, [user]);
 
-  const sendMessage = (text) => {
-    if (!user || user.isAdmin) return;
+  const sendMessage = async (text) => {
+    if (!user) return;
     
-    const newMessage = {
-      id: Date.now(),
-      sender: 'user',
-      text,
-      timestamp: new Date().toISOString()
-    };
-    
-    const userMessages = conversations[user.id] || [];
-    const updatedMessages = [...userMessages, newMessage];
-    const newConversations = { ...conversations, [user.id]: updatedMessages };
-    setConversations(newConversations);
-    localStorage.setItem(`autocare_messages_${user.id}`, JSON.stringify(updatedMessages));
-
-    // Save user to message list for admin view
-    const updatedUserList = saveUserToMessageList(user);
-    setUsersWithMessages(updatedUserList);
-
-    // Only send auto-reply if this is the user's first message
-    const isFirstMessage = userMessages.length === 0;
-    if (isFirstMessage) {
-      setTimeout(() => {
-        const reply = {
-          id: Date.now() + 1,
-          sender: 'admin',
-          text: "Thanks for your message! An admin will review it shortly and get back to you.",
-          timestamp: new Date().toISOString()
-        };
-        const messagesWithReply = [...updatedMessages, reply];
-        const finalConversations = { ...conversations, [user.id]: messagesWithReply };
-        setConversations(finalConversations);
-        localStorage.setItem(`autocare_messages_${user.id}`, JSON.stringify(messagesWithReply));
-      }, 1500);
+    try {
+      // Send message to backend
+      const messageData = {
+        text: text,
+        recipientId: user.isAdmin ? null : undefined // Admin needs to specify recipient
+      };
+      
+      const response = await apiService.sendMessage(messageData);
+      
+      if (response.success) {
+        // Update local state with the sent message
+        const sentMessage = response.data;
+        const conversationId = user.isAdmin ? sentMessage.recipient : user.id;
+        
+        const currentMessages = conversations[conversationId] || [];
+        const updatedMessages = [...currentMessages, sentMessage];
+        const newConversations = { ...conversations, [conversationId]: updatedMessages };
+        setConversations(newConversations);
+        
+        // Also save locally as backup
+        saveMessageLocally(sentMessage, conversationId);
+        
+        // If auto-reply was sent, add it to state
+        if (response.autoReply) {
+          const messagesWithReply = [...updatedMessages, response.autoReply];
+          const finalConversations = { ...conversations, [conversationId]: messagesWithReply };
+          setConversations(finalConversations);
+          saveMessageLocally(response.autoReply, conversationId);
+        }
+        
+        // Update user list for admin view
+        if (!user.isAdmin) {
+          saveUserToMessageList(user);
+        }
+      } else {
+        throw new Error(response.message || 'Failed to send message');
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      
+      // Fallback to local storage only
+      const newMessage = {
+        id: Date.now(),
+        sender: user.isAdmin ? 'admin' : 'user',
+        text,
+        timestamp: new Date().toISOString(),
+        pending: true // Mark as pending sync
+      };
+      
+      const conversationId = user.id;
+      const currentMessages = conversations[conversationId] || [];
+      const updatedMessages = [...currentMessages, newMessage];
+      const newConversations = { ...conversations, [conversationId]: updatedMessages };
+      setConversations(newConversations);
+      saveMessageLocally(newMessage, conversationId);
+      
+      // Save user to message list
+      if (!user.isAdmin) {
+        saveUserToMessageList(user);
+      }
     }
   };
 
-  const sendMessageToUser = (userId, text) => {
+  const sendMessageToUser = async (userId, text) => {
     if (!user || !user.isAdmin) return;
 
-    const newMessage = {
-      id: Date.now(),
-      sender: 'admin',
-      text,
-      timestamp: new Date().toISOString()
-    };
+    try {
+      // Send message to backend
+      const response = await apiService.sendMessage({
+        text: text,
+        recipientId: userId
+      });
+      
+      if (response.success) {
+        // Update local state with the sent message
+        const sentMessage = response.data;
+        const userMessages = conversations[userId] || [];
+        const updatedMessages = [...userMessages, sentMessage];
+        const newConversations = { ...conversations, [userId]: updatedMessages };
+        setConversations(newConversations);
+        
+        // Also save locally as backup
+        saveMessageLocally(sentMessage, userId);
+      } else {
+        throw new Error(response.message || 'Failed to send message');
+      }
+    } catch (error) {
+      console.error('Failed to send admin message:', error);
+      
+      // Fallback to local storage
+      const newMessage = {
+        id: Date.now(),
+        sender: 'admin',
+        text,
+        timestamp: new Date().toISOString(),
+        pending: true
+      };
 
-    const userMessages = conversations[userId] || [];
-    const updatedMessages = [...userMessages, newMessage];
-    const newConversations = { ...conversations, [userId]: updatedMessages };
-    setConversations(newConversations);
-    localStorage.setItem(`autocare_messages_${userId}`, JSON.stringify(updatedMessages));
-    
-    // Update the admin's view of conversations
-    if (user?.isAdmin) {
-      const allConvos = getAllConversations();
-      setConversations(allConvos);
+      const userMessages = conversations[userId] || [];
+      const updatedMessages = [...userMessages, newMessage];
+      const newConversations = { ...conversations, [userId]: updatedMessages };
+      setConversations(newConversations);
+      saveMessageLocally(newMessage, userId);
     }
+  };
+
+  const refreshMessages = () => {
+    loadMessages();
   };
 
   const value = {
@@ -142,7 +227,8 @@ export const MessageProvider = ({ children }) => {
     usersWithMessages,
     sendMessage,
     sendMessageToUser,
-    refreshUserList,
+    refreshMessages,
+    loading,
   };
 
   return (

@@ -1,22 +1,76 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { MapPin, Truck, Navigation, Home } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { MapPin, Truck, Navigation, Home, Building, User, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
-const MapView = ({ trucks = [], pickupRequests = [], userLocation = null, showControls = true }) => {
+const MapView = ({ showControls = true, height = 400 }) => {
+  const { user } = useAuth();
   const canvasRef = useRef(null);
   const [mapCenter, setMapCenter] = useState({ lat: -1.2921, lng: 36.8219 }); // Nairobi center
   const [zoom, setZoom] = useState(1);
+  const [mapData, setMapData] = useState({
+    trucks: [],
+    pickupRequests: [],
+    branches: []
+  });
+  const [userLocation, setUserLocation] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  // Convert lat/lng to canvas coordinates
+  // Load real map data from backend
+  const loadMapData = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      const response = await apiService.getFleetMapData();
+      
+      if (response.success) {
+        setMapData(response.data);
+        setLastUpdate(new Date());
+      }
+    } catch (error) {
+      console.error('Failed to load map data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Get user's current location
+  const getUserLocation = useCallback(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+          
+          // Center map on user location if first time
+          if (!userLocation) {
+            setMapCenter({ lat: latitude, lng: longitude });
+          }
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+  }, [userLocation]);
+
+  // Convert lat/lng to canvas coordinates with more accurate projection
   const latLngToCanvas = (lat, lng, canvasWidth, canvasHeight) => {
-    // Simple projection for demo (not geographically accurate)
     const centerLat = mapCenter.lat;
     const centerLng = mapCenter.lng;
     
-    const x = (canvasWidth / 2) + ((lng - centerLng) * 10000 * zoom);
-    const y = (canvasHeight / 2) - ((lat - centerLat) * 10000 * zoom);
+    // More accurate mercator-like projection
+    const latRad = lat * Math.PI / 180;
+    const centerLatRad = centerLat * Math.PI / 180;
+    
+    const x = (canvasWidth / 2) + ((lng - centerLng) * 1000 * zoom);
+    const y = (canvasHeight / 2) - ((latRad - centerLatRad) * 1000 * zoom);
     
     return { x, y };
   };
@@ -31,35 +85,67 @@ const MapView = ({ trucks = [], pickupRequests = [], userLocation = null, showCo
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Draw map background
-    ctx.fillStyle = '#1a1a1a';
+    // Draw map background with street-like appearance
+    ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw grid lines
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < width; i += 50) {
+    // Draw road network (simplified grid)
+    ctx.strokeStyle = '#374151';
+    ctx.lineWidth = 3;
+    
+    // Major roads
+    for (let i = 0; i < width; i += 100) {
       ctx.beginPath();
       ctx.moveTo(i, 0);
       ctx.lineTo(i, height);
       ctx.stroke();
     }
-    for (let i = 0; i < height; i += 50) {
+    for (let i = 0; i < height; i += 100) {
       ctx.beginPath();
       ctx.moveTo(0, i);
       ctx.lineTo(width, i);
       ctx.stroke();
     }
 
-    // Draw center marker
-    const center = latLngToCanvas(mapCenter.lat, mapCenter.lng, width, height);
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, 8, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.fillStyle = 'white';
-    ctx.font = '12px Arial';
-    ctx.fillText('Nairobi CBD', center.x + 12, center.y + 4);
+    // Minor roads
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 1;
+    for (let i = 50; i < width; i += 100) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, height);
+      ctx.stroke();
+    }
+    for (let i = 50; i < height; i += 100) {
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(width, i);
+      ctx.stroke();
+    }
+
+    // Draw branches first (as base layer)
+    mapData.branches.forEach((branch) => {
+      if (branch.location?.coordinates) {
+        const pos = latLngToCanvas(
+          branch.location.coordinates.latitude, 
+          branch.location.coordinates.longitude, 
+          width, 
+          height
+        );
+        
+        if (pos.x >= 0 && pos.x <= width && pos.y >= 0 && pos.y <= height) {
+          // Draw branch building
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(pos.x - 8, pos.y - 8, 16, 16);
+          
+          // Draw branch label
+          ctx.fillStyle = 'white';
+          ctx.font = '10px Arial';
+          ctx.fillText(branch.name, pos.x + 12, pos.y - 8);
+          ctx.fillText(`${branch.truckCount}/${branch.maxCapacity} trucks`, pos.x + 12, pos.y + 4);
+        }
+      }
+    });
 
     // Draw pickup requests
     pickupRequests.forEach((request, index) => {
