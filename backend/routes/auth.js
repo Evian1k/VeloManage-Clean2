@@ -5,6 +5,28 @@ import User from '../models/User.js';
 
 const router = express.Router();
 
+// @route   GET /api/v1/auth/test-admin
+// @desc    Test admin email validation
+// @access  Public
+router.get('/test-admin/:email', (req, res) => {
+  const email = req.params.email;
+  const isAdmin = User.isAdminEmail(email);
+  const adminData = User.getAdminByEmail(email);
+  
+  res.json({
+    email,
+    isAdmin,
+    adminData,
+    adminEmails: [
+      'emmanuel.evian@autocare.com',
+      'ibrahim.mohamud@autocare.com',
+      'joel.nganga@autocare.com',
+      'patience.karanja@autocare.com',
+      'joyrose.kinuthia@autocare.com'
+    ]
+  });
+});
+
 // JWT token generation
 const generateToken = (userId) => {
   return jwt.sign(
@@ -35,9 +57,16 @@ router.post('/register', [
     .withMessage('Please provide a valid phone number')
 ], async (req, res) => {
   try {
+    console.log('Registration attempt:', { 
+      email: req.body.email, 
+      name: req.body.name,
+      hasPassword: !!req.body.password 
+    });
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         errors: errors.array()
@@ -49,6 +78,7 @@ router.post('/register', [
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('User already exists:', email);
       return res.status(400).json({
         success: false,
         message: 'User already exists with this email'
@@ -56,10 +86,18 @@ router.post('/register', [
     }
 
     // Check if trying to register with admin email
+    console.log('Checking if admin email:', email, 'Is admin:', User.isAdminEmail(email));
     if (User.isAdminEmail(email)) {
       // Admin registration - verify admin password
       const adminPassword = process.env.ADMIN_PASSWORD || 'autocarpro12k@12k.wwc';
+      console.log('Admin password check:', { 
+        provided: password, 
+        expected: adminPassword, 
+        match: password === adminPassword 
+      });
+      
       if (password !== adminPassword) {
+        console.log('Admin password mismatch');
         return res.status(403).json({
           success: false,
           message: 'Invalid admin password for admin registration.'
@@ -68,7 +106,10 @@ router.post('/register', [
       
       // Get admin data
       const adminData = User.getAdminByEmail(email);
+      console.log('Admin data for email:', email, adminData);
+      
       if (!adminData) {
+        console.log('No admin data found for email:', email);
         return res.status(403).json({
           success: false,
           message: 'Email not authorized for admin registration.'
@@ -76,6 +117,14 @@ router.post('/register', [
       }
 
       // Create admin user
+      console.log('Creating admin user with data:', {
+        name: adminData.name,
+        email: email,
+        phone: phone || '',
+        isAdmin: true,
+        role: adminData.role
+      });
+      
       const adminUser = new User({
         name: adminData.name,
         email: email,
@@ -85,7 +134,9 @@ router.post('/register', [
         role: adminData.role
       });
 
+      console.log('Saving admin user...');
       await adminUser.save();
+      console.log('Admin user saved successfully:', adminUser._id);
 
       // Generate JWT token
       const token = generateToken(adminUser._id);
