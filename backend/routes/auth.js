@@ -40,7 +40,6 @@ router.post('/register', [
     .isMobilePhone()
     .withMessage('Please provide a valid phone number')
 ], 
-checkDuplicateEmail, // This middleware will handle duplicate emails
 async (req, res) => {
   try {
     console.log('Registration attempt:', { 
@@ -61,9 +60,9 @@ async (req, res) => {
 
     const { name, email, password, phone } = req.body;
 
-    // Note: Duplicate email check is already handled by middleware
-    // If we reach here, the email is available for registration
-
+    // Check if user already exists (for regular users only)
+    const existingUser = await User.findOne({ email });
+    
     // Check if trying to register with admin email
     console.log('Checking if admin email:', email, 'Is admin:', User.isAdminEmail(email));
     if (User.isAdminEmail(email)) {
@@ -94,6 +93,19 @@ async (req, res) => {
           success: false,
           message: 'Email not authorized for admin registration.',
           code: 'UNAUTHORIZED_ADMIN_EMAIL'
+        });
+      }
+
+      // Check if admin already exists - if so, prevent duplicate registration
+      if (existingUser) {
+        console.log('Admin already exists:', email);
+        return res.status(409).json({
+          success: false,
+          message: 'This admin email has already been registered. Please try signing in instead.',
+          code: 'EMAIL_ALREADY_EXISTS',
+          action: 'redirect_to_login',
+          userType: 'admin',
+          loginUrl: '/login'
         });
       }
 
@@ -136,6 +148,19 @@ async (req, res) => {
           vehicleCount: adminUser.vehicleCount,
           createdAt: adminUser.createdAt
         }
+      });
+    }
+
+    // Check if regular user already exists
+    if (existingUser) {
+      console.log('User already exists:', email);
+      return res.status(409).json({
+        success: false,
+        message: 'You have already been signed up with this email. Try signing in instead.',
+        code: 'EMAIL_ALREADY_EXISTS',
+        action: 'redirect_to_login',
+        userType: 'user',
+        loginUrl: '/login'
       });
     }
 

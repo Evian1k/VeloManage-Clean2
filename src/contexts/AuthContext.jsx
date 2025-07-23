@@ -23,47 +23,101 @@ export const AuthProvider = ({ children }) => {
       const savedToken = localStorage.getItem('autocare_token');
       const savedUser = localStorage.getItem('autocare_user');
       
+      console.log('🔄 Initializing auth...', { hasToken: !!savedToken, hasUser: !!savedUser });
+      
       if (savedToken && savedUser) {
         try {
-          // Verify token and get complete user profile from backend
-          apiService.setAuthToken(savedToken);
+          // First, load from saved data immediately for better UX
+          const parsedUser = JSON.parse(savedUser);
+          if (parsedUser && parsedUser.id) {
+            console.log('📦 Loading user from localStorage:', parsedUser.email);
+            setUser(parsedUser);
+            apiService.setAuthToken(savedToken);
+          }
+
+          // Then verify token and get fresh data from backend
           const verifyResponse = await apiService.verifyToken();
           
           if (verifyResponse.success) {
-            // Get complete profile with messages and requests
-            const profileResponse = await apiService.getProfile();
+            console.log('✅ Token verified, loading fresh profile...');
             
-            if (profileResponse.success) {
-              const userData = {
-                ...profileResponse.data.user,
-                token: savedToken,
-                messages: profileResponse.data.messages || [],
-                bookings: profileResponse.data.bookings || [],
-                statistics: profileResponse.data.statistics || {}
-              };
-              setUser(userData);
-              localStorage.setItem('autocare_user', JSON.stringify(userData));
-            } else {
-              // Fallback to basic user data
-              const userData = {
-                ...verifyResponse.user,
-                token: savedToken
-              };
-              setUser(userData);
-              localStorage.setItem('autocare_user', JSON.stringify(userData));
+            try {
+              // Get complete profile with messages and requests
+              const profileResponse = await apiService.getProfile();
+              
+              if (profileResponse.success) {
+                console.log('📊 Profile loaded:', {
+                  user: profileResponse.data.user.email,
+                  messages: profileResponse.data.messages?.length || 0,
+                  bookings: profileResponse.data.bookings?.length || 0
+                });
+                
+                const userData = {
+                  ...profileResponse.data.user,
+                  token: savedToken,
+                  messages: profileResponse.data.messages || [],
+                  bookings: profileResponse.data.bookings || [],
+                  statistics: profileResponse.data.statistics || {}
+                };
+                
+                setUser(userData);
+                localStorage.setItem('autocare_user', JSON.stringify(userData));
+                console.log('💾 User data updated successfully');
+              } else {
+                console.warn('⚠️ Profile loading failed, using basic user data');
+                const userData = {
+                  ...verifyResponse.user,
+                  token: savedToken,
+                  messages: parsedUser?.messages || [],
+                  bookings: parsedUser?.bookings || [],
+                  statistics: parsedUser?.statistics || {}
+                };
+                setUser(userData);
+                localStorage.setItem('autocare_user', JSON.stringify(userData));
+              }
+            } catch (profileError) {
+              console.warn('⚠️ Profile request failed, keeping saved data:', profileError.message);
+              // Keep existing saved user data if profile loading fails
+              if (parsedUser && parsedUser.id) {
+                setUser(parsedUser);
+              }
             }
           } else {
-            // Token invalid, clear storage
+            console.warn('❌ Token verification failed');
             localStorage.removeItem('autocare_token');
             localStorage.removeItem('autocare_user');
+            setUser(null);
           }
         } catch (error) {
-          console.error('Token verification failed:', error);
-          localStorage.removeItem('autocare_token');
-          localStorage.removeItem('autocare_user');
+          console.error('🚨 Auth initialization error:', error);
+          
+          // Fallback to saved user data if backend is unavailable
+          try {
+            const userData = JSON.parse(savedUser);
+            if (userData && userData.id) {
+              console.log('🔄 Using saved user data as fallback:', userData.email);
+              setUser(userData);
+              apiService.setAuthToken(savedToken);
+            } else {
+              console.warn('❌ Invalid saved data, clearing storage');
+              localStorage.removeItem('autocare_token');
+              localStorage.removeItem('autocare_user');
+              setUser(null);
+            }
+          } catch (parseError) {
+            console.error('🚨 Failed to parse saved user data:', parseError);
+            localStorage.removeItem('autocare_token');
+            localStorage.removeItem('autocare_user');
+            setUser(null);
+          }
         }
+      } else {
+        console.log('ℹ️ No saved auth data found');
+        setUser(null);
       }
+      
       setLoading(false);
+      console.log('✅ Auth initialization complete');
     };
     
     initializeAuth();
@@ -85,6 +139,12 @@ export const AuthProvider = ({ children }) => {
           const profileResponse = await apiService.getProfile();
           
           if (profileResponse.success) {
+            console.log('📊 Login: Profile loaded successfully:', {
+              user: profileResponse.data.user.email,
+              messages: profileResponse.data.messages?.length || 0,
+              bookings: profileResponse.data.bookings?.length || 0
+            });
+            
             const userData = {
               ...profileResponse.data.user,
               token: response.token,
@@ -96,11 +156,12 @@ export const AuthProvider = ({ children }) => {
             setUser(userData);
             localStorage.setItem('autocare_token', response.token);
             localStorage.setItem('autocare_user', JSON.stringify(userData));
+            console.log('💾 Login: Complete user data saved');
             
             return userData;
           }
         } catch (profileError) {
-          console.warn('Could not load profile data:', profileError);
+          console.warn('⚠️ Could not load profile data after login:', profileError);
         }
         
         // Fallback to basic user data
