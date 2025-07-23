@@ -55,7 +55,7 @@ export const MessageProvider = ({ children }) => {
   const [usersWithMessages, setUsersWithMessages] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Load messages from backend
+  // Load messages from backend or user profile
   const loadMessages = async () => {
     if (!user) return;
     
@@ -74,25 +74,37 @@ export const MessageProvider = ({ children }) => {
           setConversations(localConvos);
         }
       } else {
-        // User: Load own messages
-        const response = await apiService.getMessages();
-        if (response.success) {
-          setConversations({ [user.id]: response.data || [] });
+        // User: Check if messages are already loaded in user data
+        if (user.messages && user.messages.length > 0) {
+          // Messages already loaded from profile
+          setConversations({ [user.id]: user.messages });
         } else {
-          // Fallback to local storage
-          const savedMessages = localStorage.getItem(`autocare_messages_${user.id}`);
-          setConversations({ [user.id]: savedMessages ? JSON.parse(savedMessages) : [] });
+          // Load messages from API
+          const response = await apiService.getMessages();
+          if (response.success) {
+            setConversations({ [user.id]: response.data || [] });
+          } else {
+            // Fallback to local storage
+            const savedMessages = localStorage.getItem(`autocare_messages_${user.id}`);
+            setConversations({ [user.id]: savedMessages ? JSON.parse(savedMessages) : [] });
+          }
         }
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
-      // Fallback to local storage
-      if (user.isAdmin) {
-        const localConvos = getLocalConversations();
-        setConversations(localConvos);
+      
+      // Use messages from user data if available
+      if (!user.isAdmin && user.messages) {
+        setConversations({ [user.id]: user.messages });
       } else {
-        const savedMessages = localStorage.getItem(`autocare_messages_${user.id}`);
-        setConversations({ [user.id]: savedMessages ? JSON.parse(savedMessages) : [] });
+        // Fallback to local storage
+        if (user.isAdmin) {
+          const localConvos = getLocalConversations();
+          setConversations(localConvos);
+        } else {
+          const savedMessages = localStorage.getItem(`autocare_messages_${user.id}`);
+          setConversations({ [user.id]: savedMessages ? JSON.parse(savedMessages) : [] });
+        }
       }
     } finally {
       setLoading(false);

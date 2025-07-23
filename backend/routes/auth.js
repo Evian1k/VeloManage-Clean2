@@ -57,9 +57,53 @@ router.post('/register', [
 
     // Check if trying to register with admin email
     if (User.isAdminEmail(email)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Admin accounts cannot be registered. Please contact system administrator.'
+      // Admin registration - verify admin password
+      const adminPassword = process.env.ADMIN_PASSWORD || 'autocarpro12k@12k.wwc';
+      if (password !== adminPassword) {
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid admin password for admin registration.'
+        });
+      }
+      
+      // Get admin data
+      const adminData = User.getAdminByEmail(email);
+      if (!adminData) {
+        return res.status(403).json({
+          success: false,
+          message: 'Email not authorized for admin registration.'
+        });
+      }
+
+      // Create admin user
+      const adminUser = new User({
+        name: adminData.name,
+        email: email,
+        password: password,
+        phone: phone || '',
+        isAdmin: true,
+        role: adminData.role
+      });
+
+      await adminUser.save();
+
+      // Generate JWT token
+      const token = generateToken(adminUser._id);
+
+      return res.status(201).json({
+        success: true,
+        message: 'Admin registered successfully',
+        token,
+        user: {
+          id: adminUser._id,
+          name: adminUser.name,
+          email: adminUser.email,
+          phone: adminUser.phone,
+          isAdmin: adminUser.isAdmin,
+          role: adminUser.role,
+          vehicleCount: adminUser.vehicleCount,
+          createdAt: adminUser.createdAt
+        }
       });
     }
 
@@ -234,10 +278,10 @@ router.post('/login', [
   }
 });
 
-// @route   POST /api/v1/auth/verify-token
-// @desc    Verify JWT token
+// @route   GET /api/v1/auth/verify
+// @desc    Verify JWT token and get user data
 // @access  Private
-router.post('/verify-token', async (req, res) => {
+router.get('/verify', async (req, res) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
